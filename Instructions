@@ -1,0 +1,2 @@
+#Download MHConstructor using singularity
+singularity pull mhconstructor.sif library://rsuseno/rsuseno/mhconstructor:latest
