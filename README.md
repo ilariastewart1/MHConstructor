@@ -19,7 +19,7 @@ Ensure you have Singularity downloaded or see other options for download on the 
 singularity pull mhconstructor.sif library://rsuseno/rsuseno/mhconstructor:latest
 ```
 
-Download [C4Investigator](https://github.com/Hollenbach-lab/C4Investigator)((Marin et al., 2024)
+Download [C4Investigator](https://github.com/Hollenbach-lab/C4Investigator)(Marin et al., 2024)
 ```
 git clone https://github.com/Hollenbach-lab/C4Investigator.git
 cd C4Investigator
