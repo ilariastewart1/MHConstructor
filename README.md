@@ -28,4 +28,10 @@ Build Singularity Container
 ```
 singularity build --fakeroot c4investigator.sif c4investigator.def
 ```
+OR if you don't want to use --fakeroot, try remote login
+```
+singularity remote login
+singularity build --remote c4investigator.sif c4investigator.def
+```
+
 # Usage Guide 
