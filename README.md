@@ -65,4 +65,18 @@ source ~/.bashrc
 # Verify installation
 samtools --version
 ```
+Download conda if you don't already have in your environment.
+```
+#Install miniconda (without sudo)
+# Download Miniconda installer
+cd ~
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+# Run the installer
+bash miniconda.sh -b -p $HOME/miniconda
+# Initialize conda in your shell
+$HOME/miniconda/bin/conda init bash
+source ~/.bashrc
+# Verify installation
+conda --version
+```
 # Usage Guide 
