@@ -80,14 +80,199 @@ source ~/.bashrc
 conda --version
 ```
 # Usage Guide 
-Example scripts can be found in /home/mac/istewart/MHConstructor_scripts/MHConstructor_script_final/
-Update the control.txt file in your MHConstructor folder with your updates folder paths
-Create a file with your .cram names 
-Copy these scripts to your own directory and change paths and file names as appropriate 
+Example scripts can be found in 
+```/home/mac/istewart/MHConstructor_scripts/MHConstructor_script_final/```
+Update the ```control.txt``` file in your MHConstructor folder with your updates folder paths
+Create a file like ```file_ids_MAC4kWGS.txt``` with your cram ids in a line separated list like this:
+```
+SAMPLEID_1
+SAMPLEID_2
+```
 
-First run 1_run_extractFastq.sh to extract fastqs from .cram files
-Next run 2_run_C4investigator.sh to run C4 investigator
-Next run 3_run_HLA-DRB1_haplotypes.sh to run T1K to gather HLA-DRB1 haplotypes
-Next run 4_run_MHConstructor_MAC4k.sh to run MHConstructor
+First run ```1_run_extractFastq.sh``` to extract fastqs from .cram files
+```
+#!/bin/bash
+# run this script first to extract fastqs from .cram files
+# nohup bash 1_run_extractFastq.sh > MAC4kWGS_run2.log 2>&1 &
 
+set -euo pipefail
 
+# cd into your folder with your MHConstructor  scripts
+cd ~/MHConstructor_scripts/MHConstructor_script_final/
+
+# Directories -- update with your file paths 
+CRAM_DIR="/yokoyama/MAC4kWGS/crams/MAC4k_subset_9.12.25"
+REF_FASTA="$HOME/hg38.fa"
+MHCONSTRUCTOR_DIR="$HOME/MHConstructor"
+OUT_DIR="$HOME/MAC4kWGS/cramToFastqOut"
+ID_FILE="$HOME/MHConstructor_scripts/MHConstructor_script_final/file_ids_MAC4kWGS.txt"
+SAMTOOLS_BIN="$HOME/samtools-1.20/samtools"
+
+# Where YOU want indexes stored:
+INDEX_DIR="$HOME/MAC4kWGS/cram_indexes"
+mkdir -p "$INDEX_DIR"
+
+echo "[INFO] Indexing CRAMs into: $INDEX_DIR"
+
+# Index each CRAM to your own folder
+while read -r ID; do
+    CRAM="${CRAM_DIR}/${ID}.cram"
+    CRAI="${INDEX_DIR}/${ID}.crai"
+
+    if [[ -f "$CRAM" ]]; then
+        echo "[INFO] Indexing $ID"
+        $SAMTOOLS_BIN index -o "$CRAI" "$CRAM"
+    else
+        echo "[WARNING] CRAM not found for ID $ID"
+    fi
+done < "$ID_FILE"
+
+echo "[INFO] Finished indexing all samples."
+
+# Now run the extraction pipeline (no changes here)
+nohup bash extractFastqFromCram_toDir_w_logging.sh \
+  "$CRAM_DIR" \
+  "$REF_FASTA" \
+  "$MHCONSTRUCTOR_DIR" \
+  "$OUT_DIR" \
+  "$ID_FILE" \
+  "$SAMTOOLS_BIN" \
+  > run_extract_MAC4kWGS_test.log &
+```
+This script will call ```extractFastqFromCram_toDir_w_logging.sh```
+```
+#! /bin/bash
+
+## Script to iterate through all *.cram files in a provided directory ($1)
+## and extract region associated with the MHC reference coordinates
+## for hg38 reference genome
+## wadekj 
+## 05/15/23
+## revised: 5/2/25
+
+## User input args:
+# $1 - name of directory containing cram files. If current directory, use "./"
+	## Otherwise, like this: "/home/user/exampleDir/"
+# $2 - reference genome. If file on local server, list full directory and file name: "/home/user/exampleDir/refGenome.fasta" Otherwise, if on remote server, input full ftp path
+# $3 - path to MHConstructor directory
+# $4 - assembly directory
+# $5 -  text file containing new line delim list of cram file ids
+
+set -euo pipefail
+
+progSamtools=${6}
+#progSamtools=${3}/MHConstructor/tools/samtools-1.9/samtools
+
+ids="$(cat ${5})"
+
+#added logging for error tracing
+for i in ${ids};
+do 
+        cramfile="$(find ${1} -name ${i}*.cram)"
+        if [[ -z "${cramfile}" ]]; then
+            echo "[ERROR] No CRAM file found for ID ${i}"
+            continue
+        fi
+
+        echo ${cramfile}
+        fname=$(basename "${cramfile}" .cram)
+        echo ${fname}
+        dirName=${4}
+        mkdir -p ${dirName}
+
+        echo "[INFO] Indexing CRAM"
+        # ${progSamtools} index ${cramfile}
+        ${progSamtools} index -o ${dirName}/${fname}.crai ${cramfile}
+
+	    ## Get MHC.bam from .cram
+        echo "[INFO] Converting CRAM to BAM"
+        ${progSamtools} view -T ${2} -b ${cramfile} -o ${dirName}/${fname}.bam
+
+        echo "[INFO] Sorting BAM"
+        ${progSamtools} sort ${dirName}/${fname}.bam -o ${dirName}/${fname}.sort.bam
+        echo 'done sort'
+
+        echo "[INFO] Indexing sorted BAM"
+        ${progSamtools} index ${dirName}/${fname}.sort.bam
+        echo 'done index'
+
+        echo "[INFO] Extracting MHC paired reads"
+        ${progSamtools} view -f 1 -h -T ${2} -b ${dirName}/${fname}.sort.bam chr6:28525013-33457522 \
+            | ${progSamtools} sort -n -o ${dirName}/${fname}_mhc_paired.sorted.bam
+
+        echo "[INFO] Extracting unmapped reads"
+        ${progSamtools} view -h -T ${2} -b ${dirName}/${fname}.sort.bam -o ${dirName}/${fname}_unmap.bam '*' \
+            && ${progSamtools} sort -n -o ${dirName}/${fname}_unmap.sorted.bam ${dirName}/${fname}_unmap.bam
+
+        echo "[INFO] Moving .crai index files"
+        mv ./*.crai ${dirName} || true  # ignore error if none found
+
+        echo "[INFO] Creating FASTQ for MHC paired reads"
+        ${progSamtools} fastq -n ${dirName}/${fname}_mhc_paired.sorted.bam \
+            -1 ${dirName}/${fname}_mhc_paired_R1.fastq \
+            -2 ${dirName}/${fname}_mhc_paired_R2.fastq \
+            -0 /dev/null -s /dev/null
+
+        echo "[INFO] Creating FASTQ for unmapped reads"
+        if [[ -f ${dirName}/${fname}_unmap.sorted.bam ]]; then
+            ${progSamtools} fastq -n ${dirName}/${fname}_unmap.sorted.bam \
+                -1 ${dirName}/${fname}_mhc_unmap_R1.fastq \
+                -2 ${dirName}/${fname}_mhc_unmap_R2.fastq \
+                -0 /dev/null -s /dev/null
+        else
+            echo "[WARNING] Unmapped BAM not found for ${fname}"
+            touch ${dirName}/${fname}_mhc_unmap_R1.fastq ${dirName}/${fname}_mhc_unmap_R2.fastq
+        fi
+        ### Merge the mapped and unmapped reads together
+        echo "[INFO] Merging FASTQs"
+        cat ${dirName}/${fname}_mhc_paired_R1.fastq ${dirName}/${fname}_mhc_unmap_R1.fastq > ${dirName}/${fname}_mhc_all_R1.fastq
+        cat ${dirName}/${fname}_mhc_paired_R2.fastq ${dirName}/${fname}_mhc_unmap_R2.fastq > ${dirName}/${fname}_mhc_all_R2.fastq
+
+        echo "[SUCCESS] Finished ${fname}"
+
+done;
+```
+Next run ```2_run_C4investigator.sh``` to run C4 investigator
+```
+#!/bin/bash
+# make sure to update lines 291/ 302 in C4Investigator_run.R with intended file output name to not overwrite prior results
+# update with your log file path
+LOGFILE="/home/mac/istewart/MHConstructor_scripts/MHConstructor_script_final/C4Investigator_run_$(date +%Y%m%d_%H%M%S).log"
+echo "[INFO] Starting C4Investigator run at $(date)" | tee -a "$LOGFILE"
+echo "[INFO] Listing FASTQ files matching pattern 'mhc_paired_R':" | tee -a "$LOGFILE"
+# update with your fastq file output
+ls /home/mac/istewart/MAC4kWGS/cramToFastqOut/*mhc_paired_R*.fastq* 2>&1 | tee -a "$LOGFILE"
+
+echo "[INFO] Running C4Investigator..." | tee -a "$LOGFILE"
+singularity exec --bind /home/mac/istewart/MAC4kWGS/cramToFastqOut,/home/mac/istewart/MHConstructor/genotypes c4investigator.sif \
+  Rscript C4Investigator_run.R \
+  -f /home/mac/istewart/MAC4kWGS/cramToFastqOut \
+  -r /home/mac/istewart/MHConstructor/genotypes \
+  --fastqPattern fastq \
+  -t 8 2>&1 | tee -a "$LOGFILE"
+
+echo "[INFO] C4Investigator run finished at $(date)" | tee -a "$LOGFILE"
+```
+
+Next run ```3_run_HLA-DRB1_haplotypes.sh``` to run T1K to gather HLA-DRB1 haplotypes
+```
+cd ~/MHConstructor/genotypes/
+singularity exec ../container/mhconstructor.sif /bin/bash genotypeDRB.sh /home/mac/istewart/MHConstructor_scripts/MHConstructor_script_final/file_ids_MAC4kWGS_test.txt
+cd ..
+```
+Next run ```4_run_MHConstructor_MAC4k.sh``` to run MHConstructor
+```
+#!/bin/bash
+
+cd /home/mac/istewart/MHConstructor || exit 1
+
+LOGFILE="/home/mac/istewart/MHConstructor_scripts/MHConstructor_scripts_final/pipeline_run_$(date +%Y%m%d_%H%M%S).log"
+
+echo "[INFO] Starting MHConstructor pipeline" | tee "${LOGFILE}"
+echo "[INFO] Timestamp: $(date)" | tee -a "${LOGFILE}"
+
+singularity exec container/mhconstructor.sif /bin/bash MHCgenerate.sh /home/mac/istewart/MHConstructor_scripts/file_ids_complete.txt \
+  | tee -a "${LOGFILE}"
+
+echo "[INFO] Pipeline finished at $(date)" | tee -a "${LOGFILE}"
+```
