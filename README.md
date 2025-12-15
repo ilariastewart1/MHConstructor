@@ -80,3 +80,14 @@ source ~/.bashrc
 conda --version
 ```
 # Usage Guide 
+Example scripts can be found in /home/mac/istewart/MHConstructor_scripts/MHConstructor_script_final/
+Update the control.txt file in your MHConstructor folder with your updates folder paths
+Create a file with your .cram names 
+Copy these scripts to your own directory and change paths and file names as appropriate 
+
+First run 1_run_extractFastq.sh to extract fastqs from .cram files
+Next run 2_run_C4investigator.sh to run C4 investigator
+Next run 3_run_HLA-DRB1_haplotypes.sh to run T1K to gather HLA-DRB1 haplotypes
+Next run 4_run_MHConstructor_MAC4k.sh to run MHConstructor
+
+
