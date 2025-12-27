@@ -98,7 +98,7 @@ First run ```1_run_extractFastq.sh``` to extract fastqs from .cram files
 set -euo pipefail
 
 # cd into your folder with your MHConstructor  scripts
-cd ~/MHConstructor_scripts/MHConstructor_script_final/
+cd /yokoyama/seqdata/projects/MHConstructor/
 
 # Directories -- update with your file paths 
 CRAM_DIR="/yokoyama/MAC4kWGS/crams/MAC4k_subset_9.12.25"
