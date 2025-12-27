@@ -81,7 +81,7 @@ conda --version
 ```
 # Usage Guide 
 Example scripts can be found in 
-```/home/mac/istewart/MHConstructor_scripts/MHConstructor_script_final/```
+```/yokoyama/seqdata/projects/MHConstructor```
 Update the ```control.txt``` file in your MHConstructor folder with your updates folder paths
 Create a file like ```file_ids_MAC4kWGS.txt``` with your cram ids in a line separated list like this:
 ```
@@ -105,7 +105,7 @@ CRAM_DIR="/yokoyama/MAC4kWGS/crams/MAC4k_subset_9.12.25"
 REF_FASTA="$HOME/hg38.fa"
 MHCONSTRUCTOR_DIR="$HOME/MHConstructor"
 OUT_DIR="$HOME/MAC4kWGS/cramToFastqOut"
-ID_FILE="$HOME/MHConstructor_scripts/MHConstructor_script_final/file_ids_MAC4kWGS.txt"
+ID_FILE="/yokoyama/seqdata/projects/MHConstructor/file_ids_MAC4kWGS.txt"
 SAMTOOLS_BIN="$HOME/samtools-1.20/samtools"
 
 # Where YOU want indexes stored:
@@ -237,17 +237,18 @@ Next run ```2_run_C4investigator.sh``` to run C4 investigator
 #!/bin/bash
 # make sure to update lines 291/ 302 in C4Investigator_run.R with intended file output name to not overwrite prior results
 # update with your log file path
-LOGFILE="/home/mac/istewart/MHConstructor_scripts/MHConstructor_script_final/C4Investigator_run_$(date +%Y%m%d_%H%M%S).log"
+LOGFILE="/yokoyama/seqdata/projects/MHConstructorC4Investigator_run_$(date +%Y%m%d_%H%M%S).log"
 echo "[INFO] Starting C4Investigator run at $(date)" | tee -a "$LOGFILE"
 echo "[INFO] Listing FASTQ files matching pattern 'mhc_paired_R':" | tee -a "$LOGFILE"
 # update with your fastq file output
-ls /home/mac/istewart/MAC4kWGS/cramToFastqOut/*mhc_paired_R*.fastq* 2>&1 | tee -a "$LOGFILE"
+ls ~/MAC4kWGS/cramToFastqOut/*mhc_paired_R*.fastq* 2>&1 | tee -a "$LOGFILE"
 
+# update with the directory location for your cramToFastqOut and your MHConstructor directory
 echo "[INFO] Running C4Investigator..." | tee -a "$LOGFILE"
-singularity exec --bind /home/mac/istewart/MAC4kWGS/cramToFastqOut,/home/mac/istewart/MHConstructor/genotypes c4investigator.sif \
+singularity exec --bind ~/MAC4kWGS/cramToFastqOut,~/MHConstructor/genotypes c4investigator.sif \
   Rscript C4Investigator_run.R \
-  -f /home/mac/istewart/MAC4kWGS/cramToFastqOut \
-  -r /home/mac/istewart/MHConstructor/genotypes \
+  -f ~/MAC4kWGS/cramToFastqOut \
+  -r ~/MHConstructor/genotypes \
   --fastqPattern fastq \
   -t 8 2>&1 | tee -a "$LOGFILE"
 
@@ -257,21 +258,21 @@ echo "[INFO] C4Investigator run finished at $(date)" | tee -a "$LOGFILE"
 Next run ```3_run_HLA-DRB1_haplotypes.sh``` to run T1K to gather HLA-DRB1 haplotypes
 ```
 cd ~/MHConstructor/genotypes/
-singularity exec ../container/mhconstructor.sif /bin/bash genotypeDRB.sh /home/mac/istewart/MHConstructor_scripts/MHConstructor_script_final/file_ids_MAC4kWGS_test.txt
+singularity exec ../container/mhconstructor.sif /bin/bash genotypeDRB.sh /yokoyama/seqdata/projects/MHConstructorfile_ids_MAC4kWGS_test.txt
 cd ..
 ```
 Next run ```4_run_MHConstructor_MAC4k.sh``` to run MHConstructor
 ```
 #!/bin/bash
 
-cd /home/mac/istewart/MHConstructor || exit 1
+cd ~/MHConstructor || exit 1
 
-LOGFILE="/home/mac/istewart/MHConstructor_scripts/MHConstructor_scripts_final/pipeline_run_$(date +%Y%m%d_%H%M%S).log"
+LOGFILE="~/MHConstructor_scripts/MHConstructor_scripts_final/pipeline_run_$(date +%Y%m%d_%H%M%S).log"
 
 echo "[INFO] Starting MHConstructor pipeline" | tee "${LOGFILE}"
 echo "[INFO] Timestamp: $(date)" | tee -a "${LOGFILE}"
 
-singularity exec container/mhconstructor.sif /bin/bash MHCgenerate.sh /home/mac/istewart/MHConstructor_scripts/file_ids_complete.txt \
+singularity exec container/mhconstructor.sif /bin/bash MHCgenerate.sh ~/MHConstructor_scripts/file_ids_complete.txt \
   | tee -a "${LOGFILE}"
 
 echo "[INFO] Pipeline finished at $(date)" | tee -a "${LOGFILE}"
